@@ -1,32 +1,31 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const app = express();
-
 const { verificaToken } = require('../middlewares/autenticacion');
 
-const Usuario = require('./../models/usuario');
+const Hospital = require('./../models/hospital');
 // =====================================
-// Obtener todos los usuarios 
+// Obtener todos los hospitales 
 // =====================================
 app.get('/', (req, res) => {
     const desde = Number(req.query.desde) || 0;
     const limit = Number(req.query.limit) || 5;
-    Usuario.find({}, 'nombre email img role')
+    Hospital.find({})
         .skip(desde)
         .limit(limit)
-        .exec((err, usuarios) => {
+        .populate('usuario', 'nombre email')
+        .exec((err, hospitales) => {
             if (err) {
                 return res.status(500).json({
                     ok: false,
-                    mensaje: 'Error cargando usuarios',
+                    mensaje: 'Error al cargar hospitales',
                     errors: err
                 });
             }
-            Usuario.countDocuments({}, (err, conteo) => {
+            Hospital.countDocuments({}, (err, conteo) => {
                 res.status(200).json({
                     ok: true,
-                    usuarios,
-                    total: conteo
+                    hospitales,
+                    total: conteo,
                 });
             });
 
@@ -34,119 +33,98 @@ app.get('/', (req, res) => {
 });
 
 // =====================================
-// Verificar token 
-// =====================================
-
-/*app.use('/', (req, res, next) => {
-    const { token } = req.query;
-    jwt.verify(token, SEED, (err, decoded) => {
-        if (err) {
-            return res.status(401).json({
-                ok: false,
-                mensaje: 'Token incorrecto',
-                errors: err
-            });
-        }
-        next();
-    });
-});*/
-
-// =====================================
-// Actualizar usuario 
+// Actualizar hospital 
 // =====================================
 app.put('/:id', verificaToken, (req, res) => {
-    const { id } = req.params;
-    const { nombre, email, role } = req.body;
-    Usuario.findById(id, (err, usuario) => {
+    const { usuario, params, body } = req;
+    const { id } = params;
+    const { nombre } = body;
+    Hospital.findById(id, (err, hospital) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
-                mensaje: 'Error al buscar usuario',
+                mensaje: 'Error al buscar hospital',
                 errors: err
             });
         }
-        if (!usuario) {
+        if (!hospital) {
             return res.status(400).json({
                 ok: false,
-                mensaje: `El usuario con el id ${id} no existe`,
-                errors: { message: 'No existe un usuario con ese ID' }
+                mensaje: `El hospital con el id ${id} no existe`,
+                errors: { message: 'No existe un hospital con ese ID' }
             });
         }
 
-        usuario.nombre = nombre;
-        usuario.email = email;
-        usuario.role = role;
-        usuario.save((err, usuarioGuardado) => {
+        hospital.nombre = nombre;
+        hospital.usuario = usuario._id;
+
+        hospital.save((err, hospitalGuardado) => {
             if (err) {
                 return res.status(400).json({
                     ok: false,
-                    mensaje: 'Error al actualizar usuario',
+                    mensaje: 'Error al actualizar hospital',
                     errors: err
                 });
             }
 
-            usuarioGuardado.password = ':)';
-
             res.status(200).json({
                 ok: true,
-                usuario: usuarioGuardado
+                hospital: hospitalGuardado
             })
         });
     });
 });
 
 // =====================================
-// Crear un nuevo usuario 
+// Crear un nuevo hospital 
 // =====================================
 app.post('/', verificaToken, (req, res) => {
-    const { nombre, email, password, img, role } = req.body;
-    const usuario = new Usuario({
+    const { usuario } = req;
+    const { nombre } = req.body;
+    const hospital = new Hospital({
         nombre,
-        email,
-        password: bcrypt.hashSync(password, 10),
-        img,
-        role
+        usuario: usuario._id
     });
-    usuario.save((err, usuarioGuardado) => {
+    hospital.save((err, hospitalGuardado) => {
         if (err) {
             return res.status(400).json({
                 ok: false,
-                mensaje: 'Error al crear usuario',
+                mensaje: 'Error al crear hospital',
                 errors: err
             });
         }
         res.status(201).json({
             ok: true,
-            usuario: usuarioGuardado,
+            hospital: hospitalGuardado,
         });
     });
 });
 
 // =====================================
-// Borrar un usuario por id 
+// Borrar un hospital por id 
 // =====================================
 app.delete('/:id', verificaToken, (req, res) => {
     const { id } = req.params;
-    Usuario.findByIdAndRemove(id, (err, usuarioBorrado) => {
+    Hospital.findByIdAndRemove(id, (err, hospitalBorrado) => {
         if (err) {
             return res.status(500).json({
                 ok: false,
-                mensaje: 'Error borrar usuario',
+                mensaje: 'Error al borrar hospital',
                 errors: err
             });
         }
 
-        if (!usuarioBorrado) {
+        if (!hospitalBorrado) {
             return res.status(400).json({
                 ok: false,
-                mensaje: 'No existe un usuario con ese id',
-                errors: { message: 'No existe un usuario con ese id' }
+                mensaje: 'No existe un hospital con ese id',
+                errors: { message: 'No existe un hospital con ese id' }
             });
         }
 
         res.status(200).json({
             ok: true,
-            usuario: usuarioBorrado
+            hospital: hospitalBorrado
         });
     });
 });
